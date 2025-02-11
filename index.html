@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cryptocurrency Portfolio Tracker</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 20px;
+      background-color: #f4f4f9;
+      color: #333;
+      transition: background-color 0.3s, color 0.3s;
+    }
+
+    .dark-mode {
+      background-color: #1a1a1a;
+      color: #ffffff;
+    }
+
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+      text-align: center;
+    }
+
+    h1 {
+      margin-bottom: 20px;
+    }
+
+    .form-group {
+      margin-bottom: 15px;
+    }
+
+    .form-group input {
+      width: 100%;
+      padding: 10px;
+      border: 1px solid #ccc;
+      border-radius: 5px;
+      background-color: white;
+      color: #333;
+    }
+
+    .portfolio-summary {
+      margin-bottom: 20px;
+    }
+
+    .portfolio-summary p {
+      margin: 5px 0;
+    }
+
+    .chart-container {
+      margin-top: 20px;
+    }
+
+    canvas {
+      max-width: 100%;
+    }
+
+    .dark-mode-toggle {
+      margin-bottom: 20px;
+    }
+
+    .dark-mode-toggle button {
+      padding: 10px 20px;
+      background-color: #007bff;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+
+    .dark-mode-toggle button:hover {
+      background-color: #0056b3;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Cryptocurrency Portfolio Tracker</h1>
+
+    <!-- Dark Mode Toggle -->
+    <div class="dark-mode-toggle">
+      <button onclick="toggleDarkMode()">Toggle Dark Mode</button>
+    </div>
+
+    <!-- User Input Form -->
+    <div class="form-group">
+      <label for="crypto-select">Select Cryptocurrency:</label>
+      <select id="crypto-select" onchange="updateForm()">
+        <option value="bitcoin">Bitcoin (BTC)</option>
+        <option value="ethereum">Ethereum (ETH)</option>
+        <option value="litecoin">Litecoin (LTC)</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label for="crypto-amount">Amount:</label>
+      <input type="number" id="crypto-amount" placeholder="Enter amount" />
+    </div>
+    <div class="form-group">
+      <label for="purchase-price">Purchase Price (per unit):</label>
+      <input type="number" id="purchase-price" placeholder="Enter purchase price" />
+    </div>
+    <button onclick="savePortfolio()" style="padding: 10px 20px; background-color: #28a745; color: white; border: none; border-radius: 5px; cursor: pointer;">
+      Save Portfolio
+    </button>
+
+    <!-- Portfolio Summary -->
+    <div class="portfolio-summary">
+      <h2>Portfolio Summary</h2>
+      <p id="current-value">Current Value: Loading...</p>
+      <p id="profit-loss">Profit/Loss: Loading...</p>
+    </div>
+
+    <!-- Historical Data Charts -->
+    <div class="chart-container">
+      <h2>Bitcoin Price Trend (Last 7 Days)</h2>
+      <canvas id="bitcoin-chart"></canvas>
+    </div>
+    <div class="chart-container">
+      <h2>Ethereum Price Trend (Last 7 Days)</h2>
+      <canvas id="ethereum-chart"></canvas>
+    </div>
+    <div class="chart-container">
+      <h2>Litecoin Price Trend (Last 7 Days)</h2>
+      <canvas id="litecoin-chart"></canvas>
+    </div>
+
+    <!-- Portfolio Breakdown Chart -->
+    <div class="chart-container">
+      <h2>Portfolio Breakdown</h2>
+      <canvas id="portfolio-chart"></canvas>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script>
+    // DOM Elements
+    const cryptoSelect = document.getElementById("crypto-select");
+    const cryptoAmountInput = document.getElementById("crypto-amount");
+    const purchasePriceInput = document.getElementById("purchase-price");
+    const currentValueElement = document.getElementById("current-value");
+    const profitLossElement = document.getElementById("profit-loss");
+    const bodyElement = document.body;
+
+    // Portfolio Data
+    let portfolio = {
+      bitcoin: { amount: 0, purchasePrice: 0 },
+      ethereum: { amount: 0, purchasePrice: 0 },
+      litecoin: { amount: 0, purchasePrice: 0 },
+    };
+
+    // Dark Mode Toggle
+    function toggleDarkMode() {
+      bodyElement.classList.toggle("dark-mode");
+    }
+
+    // Update Form Based on Selected Cryptocurrency
+    function updateForm() {
+      const selectedCrypto = cryptoSelect.value;
+      cryptoAmountInput.value = portfolio[selectedCrypto].amount || 0;
+      purchasePriceInput.value = portfolio[selectedCrypto].purchasePrice || 0;
+    }
+
+    // Save Portfolio
+    function savePortfolio() {
+      const selectedCrypto = cryptoSelect.value;
+      portfolio[selectedCrypto].amount = parseFloat(cryptoAmountInput.value) || 0;
+      portfolio[selectedCrypto].purchasePrice = parseFloat(purchasePriceInput.value) || 0;
+      fetchCryptoData();
+      renderPortfolioChart();
+    }
+
+    // Fetch Real-Time Crypto Data
+    async function fetchCryptoData() {
+      const cryptos = ["bitcoin", "ethereum", "litecoin"];
+      const url = `https://api.coingecko.com/api/v3/simple/price?ids=${cryptos.join(",")}&vs_currencies=usd`;
+
+      try {
+        const response = await fetch(url);
+        const data = await response.json();
+
+        // Calculate Portfolio Value and Profit/Loss
+        let totalValue = 0;
+        let totalProfitLoss = 0;
+
+        for (const crypto of cryptos) {
+          const currentPrice = data[crypto].usd;
+          const currentValue = portfolio[crypto].amount * currentPrice;
+          const profitLoss = currentValue - portfolio[crypto].amount * portfolio[crypto].purchasePrice;
+          totalValue += currentValue;
+          totalProfitLoss += profitLoss;
+        }
+
+        // Update DOM
+        currentValueElement.textContent = `Current Value: $${totalValue.toFixed(2)}`;
+        profitLossElement.textContent = `Profit/Loss: $${totalProfitLoss.toFixed(2)}`;
+      } catch (error) {
+        console.error("Error fetching crypto data:", error);
+      }
+    }
+
+    // Fetch Historical Crypto Data
+    async function fetchHistoricalData() {
+      const cryptos = ["bitcoin", "ethereum", "litecoin"];
+
+      for (const crypto of cryptos) {
+        const url = `https://api.coingecko.com/api/v3/coins/${crypto}/market_chart?vs_currency=usd&days=7`;
+        try {
+          const response = await fetch(url);
+          const data = await response.json();
+          const prices = data.prices;
+
+          // Format data for Chart.js
+          const labels = prices.map((price) => new Date(price[0]).toLocaleDateString());
+          const chartData = prices.map((price) => price[1]);
+
+          // Render Chart
+          renderPriceChart(crypto, labels, chartData);
+        } catch (error) {
+          console.error(`Error fetching historical data for ${crypto}:`, error);
+        }
+      }
+    }
+
+    // Render Price Chart for Each Cryptocurrency
+    function renderPriceChart(crypto, labels, data) {
+      const ctx = document.getElementById(`${crypto}-chart`).getContext("2d");
+
+      if (window[`${crypto}Chart`]) {
+        window[`${crypto}Chart`].destroy(); // Destroy existing chart
+      }
+
+      window[`${crypto}Chart`] = new Chart(ctx, {
+        type: "line",
+        data: {
+          labels: labels,
+          datasets: [
+            {
+              label: `${crypto.toUpperCase()} Price`,
+              data: data,
+              borderColor: crypto === "bitcoin" ? "#f7931a" : crypto === "ethereum" ? "#627eea" : "#345d9d",
+              fill: false,
+            },
+          ],
+        },
+        options: {
+          responsive: true,
+          scales: {
+            x: {
+              display: true,
+              title: {
+                display: true,
+                text: "Date",
+              },
+            },
+            y: {
+              display: true,
+              title: {
+                display: true,
+                text: "Price (USD)",
+              },
+            },
+          },
+        },
+      });
+    }
+
+    // Render Portfolio Breakdown Chart
+    function renderPortfolioChart() {
+      const ctx = document.getElementById("portfolio-chart").getContext("2d");
+
+      if (window.portfolioChart) {
+        window.portfolioChart.destroy(); // Destroy existing chart
+      }
+
+      const data = {
+        labels: ["Bitcoin", "Ethereum", "Litecoin"],
+        datasets: [
+          {
+            data: [portfolio.bitcoin.amount, portfolio.ethereum.amount, portfolio.litecoin.amount],
+            backgroundColor: ["#f7931a", "#627eea", "#345d9d"],
+          },
+        ],
+      };
+
+      window.portfolioChart = new Chart(ctx, {
+        type: "pie",
+        data: data,
+        options: {
+          responsive: true,
+        },
+      });
+    }
+
+    // Auto-Refresh Data (every 5 seconds)
+    setInterval(() => {
+      fetchCryptoData();
+      fetchHistoricalData();
+    }, 5000); // 5 seconds
+
+    // Initial Load
+    fetchCryptoData();
+    fetchHistoricalData();
+    renderPortfolioChart();
+  </script>
+</body>
+</html>
